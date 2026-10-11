@@ -23,12 +23,6 @@
   button.on{background:var(--g);color:#fff}
   button:disabled{opacity:.5}
   button.big{width:100%;min-height:54px;font-size:17px}
-  /* ออเดอร์ QR ที่ยังไม่ส่ง: ป้ายกะพริบ + กรอบส้มเต้น */
-  @keyframes blink{0%,100%{background:#F59E0B;color:#fff}50%{background:#FEF3C7;color:var(--warn)}}
-  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.55)}50%{box-shadow:0 0 0 6px rgba(245,158,11,.15)}}
-  .badge.blink{animation:blink 1s ease-in-out infinite;font-size:15px;padding:5px 14px}
-  .card.todo{border:2px solid #F59E0B;animation:pulse 1.6s ease-in-out infinite}
-  .card.todo.late{border-color:var(--red)}
   .badge{display:inline-block;font-size:13px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--g2);color:var(--g)}
   .badge.w{background:#FEF3C7;color:var(--warn)}
   .badge.r{background:#FBE9E7;color:var(--red)}
@@ -89,10 +83,9 @@ function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 var API = 'https://script.google.com/macros/s/AKfycbx_oO0QuXznUCtRi-vTO-EFAUhNowiQ19q52pitfFOjzc5zoCMVjBM15nOpKV9yAJRrSA/exec';
 function call(action){ var args = [].slice.call(arguments,1);
-  var ctl = window.AbortController ? new AbortController() : null; if (ctl) setTimeout(function(){ ctl.abort(); }, 25000);
-  return fetch(API, { signal: ctl ? ctl.signal : undefined, method:'POST', body: JSON.stringify({ action: action, args: args }) })
+  return fetch(API, { method:'POST', body: JSON.stringify({ action: action, args: args }) })
     .then(function(r){ if (!r.ok) throw new Error('เชื่อมต่อระบบไม่ได้ ลองใหม่อีกครั้ง'); return r.json(); })
-    .then(function(j){ if (!j.ok) throw new Error(j.error); return j.data; }, function(e){ if (e && e.name === 'AbortError') throw new Error('ระบบตอบช้าผิดปกติ กรุณารีเฟรชหน้านี้'); throw e; });
+    .then(function(j){ if (!j.ok) throw new Error(j.error); return j.data; });
 }
 function msg(e){ return (e&&e.message)?e.message.replace(/^Exception:\s*/,''):'เกิดข้อผิดพลาด'; }
 
@@ -219,8 +212,8 @@ function render(d){
 
 function card(o){
   var late = o.status !== 'ลูกค้ารับแล้ว' && o.mins >= 30;
-  var cls = 'card' + (o.status !== 'ลูกค้ารับแล้ว' ? ' todo' : '') + (late ? ' late' : '') + (o.status === 'ลูกค้ารับแล้ว' ? ' done' : '');
-  var st = o.status === 'ลูกค้ารับแล้ว' ? '<span class="badge">รับแล้ว '+esc(o.picked)+'</span>' : '<span class="badge blink">ต้องทำ</span>';
+  var cls = 'card' + (late ? ' late' : '') + (o.status === 'ลูกค้ารับแล้ว' ? ' done' : '');
+  var st = o.status === 'ลูกค้ารับแล้ว' ? '<span class="badge">รับแล้ว '+esc(o.picked)+'</span>' : '<span class="badge w">ต้องทำ</span>';
   var h = '<div class="'+cls+'"><div class="row"><span class="q">'+esc(o.queue)+'</span><span>'+st+'</span></div>';
   h += '<div class="meta">'+esc(o.time)+' · ตู้ '+esc(o.pump)+' · '+o.mins+' นาทีที่แล้ว'+(late?' · <b style="color:var(--red)">ค้างเกิน 30 นาที</b>':'')+'</div>';
   h += '<div class="items">'+esc(o.items)+'</div>';
@@ -254,7 +247,10 @@ function b2bCard(b){
   h += b.items ? '<div class="items">'+esc(b.items)+'</div>' : '<div class="items" style="color:var(--red)">ไม่มีรายการใน Sheet B2B (เช็กแถวนี้)</div>';
   if (b.free && !/ไม่รับสิทธิ์/.test(b.free)) h += '<div class="meta" style="color:var(--g);font-weight:600">แถม: '+esc(b.free)+'</div>';
   if (b.note) h += '<div class="meta">หมายเหตุ: '+esc(b.note)+'</div>';
-  h += '<div class="meta">ยอดโอน ฿'+esc(b.total)+(/^https?:\/\//.test(b.slip) ? ' · <a href="'+esc(b.slip)+'" target="_blank" rel="noopener">ดูสลิป</a>' : (b.slip ? ' · '+esc(b.slip) : ''))+'</div>';
+  var trial = /ทดลองฟรี/.test(b.slip);
+  if (trial) h += '<div class="meta"><span class="badge w">🎁 ออเดอร์ทดลองฟรี · ไม่ต้องเช็กเงินเข้า</span></div>';
+  h += '<div class="meta">ยอดโอน ฿'+esc(b.total)+(/^https?:\/\//.test(b.slip) ? ' · <a href="'+esc(b.slip)+'" target="_blank" rel="noopener">ดูสลิป</a> '+
+    (b.slipQR ? '<span class="badge">สลิปไม่ซ้ำ ✓</span>' : '<span class="badge r">ไม่มี QR ในสลิป ตรวจด้วยตา</span>') : (b.slip && !trial ? ' · '+esc(b.slip) : ''))+'</div>';
   if (!cancel && !sent) h += '<div class="btns"><button class="on big" onclick="actB2B(\''+esc(b.orderNo)+'\',\'complete\')">คีย์ POS + ส่งออกแล้ว</button></div>';
   return h + '</div>';
 }
