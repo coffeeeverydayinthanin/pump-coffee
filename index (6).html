@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สั่งกาแฟจากในรถ</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<style>
+  :root{--g:#1F5C3A;--g2:#E7F0EA;--bg:#F6F4EF;--ink:#1C1B18;--mut:#5F5B52;--line:#DAD6CC}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Thai',sans-serif;-webkit-tap-highlight-color:transparent}
+  .wrap{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding:20px 16px 120px}
+  .top{display:flex;justify-content:space-between;align-items:center}
+  .shop{font-size:14px;font-weight:600;color:var(--mut)}
+  .pump{font-size:13px;font-weight:600;background:var(--g);color:#fff;padding:6px 12px;border-radius:999px}
+  .bar{display:flex;gap:6px;margin-top:16px}.bar div{flex:1;height:4px;border-radius:2px;background:var(--line)}.bar div.on{background:var(--g)}
+  h1{margin:24px 0 8px;font-size:28px;line-height:1.25}
+  p.sub{margin:0;color:var(--mut);font-size:16px;line-height:1.5}
+  .card{background:#fff;border-radius:16px;padding:16px;margin-top:14px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  label{font-size:15px;font-weight:600;display:block;margin-bottom:8px}
+  input[type=tel]{width:100%;height:52px;border:1.5px solid #CFCAC0;border-radius:12px;padding:0 16px;font-size:18px;font-family:inherit;background:#FBFAF7}
+  .hint{margin-top:10px;background:var(--g2);color:var(--g);border-radius:10px;padding:10px 12px;font-size:14px;font-weight:500}
+  .btn{width:100%;height:56px;border:none;border-radius:14px;background:var(--g);color:#fff;font-size:18px;font-weight:600;font-family:inherit;cursor:pointer}
+  .btn:disabled{opacity:.5}
+  .ghost{background:transparent;color:#44403A;text-decoration:underline;font-size:16px;height:48px}
+  .out{background:#fff;color:var(--g);border:1.5px solid var(--g)}
+  .item-name{font-size:17px;font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{font-family:inherit;font-size:14px;padding:8px 14px;min-height:40px;border-radius:999px;border:none;background:#F0EEE8;color:var(--mut);cursor:pointer}
+  .chip.on{background:var(--g);color:#fff;font-weight:600}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .add{margin-top:12px;height:46px;font-size:16px}
+  .qty{display:flex;align-items:center;gap:10px}
+  .qbtn{width:44px;height:44px;border-radius:22px;border:1.5px solid #CFCAC0;background:#fff;font-size:22px;font-family:inherit;cursor:pointer}
+  .qbtn.p{border:none;background:var(--g);color:#fff}
+  .foot{position:fixed;left:0;right:0;bottom:0;background:#fff;box-shadow:0 -2px 12px rgba(0,0,0,.08);padding:14px 16px 22px}
+  .foot .in{max-width:480px;margin:0 auto;display:flex;gap:14px;align-items:center}
+  .sum{display:flex;flex-direction:column;min-width:90px}.sum small{color:var(--mut);font-size:13px}.sum b{font-size:20px}
+  .line{display:flex;justify-content:space-between;font-size:15px;padding:4px 0}
+  .disc{color:var(--g);font-weight:500}
+  .total{border-top:1px solid #E6E2D8;margin-top:8px;padding-top:10px;font-size:20px;font-weight:700}
+  #qr{display:flex;justify-content:center;margin:12px 0}
+  #qr img{border:8px solid #fff}
+  .center{text-align:center}
+  .slipPrev{max-width:100%;max-height:240px;border-radius:10px;margin-top:10px;display:none}
+  .queue{background:var(--g);color:#fff;border-radius:20px;padding:24px;text-align:center;margin-top:24px}
+  .queue small{color:#D3E6DA;font-size:15px}.queue b{display:block;font-size:72px;line-height:1.1;letter-spacing:2px}
+  .paid{display:inline-block;margin-top:6px;background:rgba(255,255,255,.16);padding:6px 12px;border-radius:999px;font-weight:600}
+  .step{display:flex;gap:12px;align-items:center;padding:6px 0;font-size:15px}
+  .step span{width:32px;height:32px;border-radius:16px;background:var(--g2);color:var(--g);font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .err{background:#FBE9E7;color:#9A2B13;border-radius:10px;padding:10px 12px;margin-top:12px;font-size:14px;display:none}
+  .hide{display:none!important}
+  .empty{color:var(--mut);text-align:center;padding:20px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <span class="shop" id="shopName">ร้านกาแฟในปั๊ม</span>
+    <span class="pump" id="pumpTag">ตู้จ่าย</span>
+  </div>
+  <div class="bar" id="bar"><div></div><div></div><div></div><div></div></div>
+
+  <div id="loading" class="empty" style="margin-top:40px">กำลังโหลด...</div>
+
+  <div id="closed" class="hide">
+    <h1>ขณะนี้ปิดรับออเดอร์ชั่วคราว</h1>
+    <p class="sub">ขออภัยครับ เชิญสั่งที่หน้าร้านได้เลย</p>
+  </div>
+
+  <!-- 1: เบอร์สมาชิก -->
+  <section id="s1" class="hide">
+    <h1>สั่งกาแฟ<br>จากในรถ</h1>
+    <p class="sub">เติมน้ำมันเสร็จ เดินไปรับที่ร้านได้เลย ไม่ต้องต่อคิว</p>
+    <div class="card">
+      <label for="phone">เบอร์สมาชิกกรีนไมลส์ <span style="font-weight:400;color:var(--mut)">(ไม่บังคับ)</span></label>
+      <input id="phone" type="tel" inputmode="numeric" maxlength="12" placeholder="08X-XXX-XXXX" autocomplete="tel">
+      <div class="hint" id="discHint"></div>
+    </div>
+    <div class="err" id="e1"></div>
+    <div style="margin-top:28px">
+      <button class="btn" onclick="toMenu(true)">ถัดไป เลือกเมนู</button>
+      <button class="btn ghost" onclick="toMenu(false)">ข้าม ไม่มีสมาชิก</button>
+    </div>
+  </section>
+
+  <!-- 2: เมนู -->
+  <section id="s2" class="hide">
+    <div class="row" style="margin-top:20px">
+      <h1 style="margin:0">เลือกเมนู</h1>
+      <span id="memberTag" class="hint" style="margin:0;padding:4px 10px"></span>
+    </div>
+    <div id="menu"></div>
+    <div id="cartBox" class="card hide">
+      <div class="item-name">ตะกร้า</div>
+      <div id="cart"></div>
+    </div>
+    <button class="btn ghost" onclick="go(1)">ย้อนกลับ</button>
+  </section>
+
+  <!-- 3: ชำระเงิน -->
+  <section id="s3" class="hide">
+    <h1>ชำระเงิน</h1>
+    <div class="card" id="summary"></div>
+    <div class="card center">
+      <div style="font-weight:600">สแกนจ่ายผ่านพร้อมเพย์ของร้าน</div>
+      <div id="qr"></div>
+      <div style="font-size:13px;color:var(--mut)">กดค้างที่ QR เพื่อบันทึกรูป แล้วเปิดสแกนในแอปธนาคาร</div>
+    </div>
+    <div class="card">
+      <label for="slip">แนบสลิปโอนเงิน</label>
+      <input id="slip" type="file" accept="image/*" onchange="onSlip(this)">
+      <img id="slipPrev" class="slipPrev" alt="ตัวอย่างสลิป">
+      <div id="slipInfo" style="font-size:14px;margin-top:8px"></div>
+    </div>
+    <div class="err" id="e3"></div>
+    <div style="margin-top:16px">
+      <button class="btn" id="confirmBtn" onclick="confirmOrder()" disabled>ยืนยันการสั่ง</button>
+      <button class="btn ghost" onclick="go(2)">แก้ไขรายการ</button>
+    </div>
+  </section>
+
+  <!-- 4: ได้คิว -->
+  <section id="s4" class="hide">
+    <div class="queue">
+      <small>เลขคิวของคุณ</small>
+      <b id="qNo">-</b>
+      <span class="paid">✓ ชำระเงินแล้ว · ร้านกำลังทำ</span>
+    </div>
+    <div class="card" id="doneInfo"></div>
+    <div class="card">
+      <div class="item-name" style="margin-bottom:6px">ขั้นตอนรับกาแฟ</div>
+      <div class="step"><span>1</span>เติมน้ำมันให้เสร็จ</div>
+      <div class="step"><span>2</span>จอดรถหน้าร้านกาแฟ</div>
+      <div class="step"><span>3</span><div>แจ้งเลขคิว <b id="qNo2"></b> ที่เคาน์เตอร์ รับได้เลย</div></div>
+    </div>
+    <p class="sub center" style="margin-top:16px;font-size:14px">แคปหน้าจอนี้ไว้ได้เลยครับ</p>
+  </section>
+</div>
+
+<div class="foot hide" id="foot">
+  <div class="in">
+    <div class="sum"><small id="fCups">0 แก้ว</small><b id="fTotal">฿0</b></div>
+    <button class="btn" id="payBtn" onclick="toPay()" disabled>ไปชำระเงิน</button>
+  </div>
+</div>
+
+<script>
+var PUMP = (new URLSearchParams(location.search).get('pump') || '').replace(/[^0-9A-Za-z]/g,'').slice(0,4);
+var D = null, member = '', cart = [], sel = {}, slip = null, quote = null, busy = false;
+var TYPE_LABEL = {hot:'ร้อน', iced:'เย็น', frappe:'ปั่น'};
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+var API = 'https://script.google.com/macros/s/AKfycbx_oO0QuXznUCtRi-vTO-EFAUhNowiQ19q52pitfFOjzc5zoCMVjBM15nOpKV9yAJRrSA/exec';
+function call(action){ var args = [].slice.call(arguments,1);
+  return fetch(API, { method:'POST', body: JSON.stringify({ action: action, args: args }) })
+    .then(function(r){ if (!r.ok) throw new Error('เชื่อมต่อระบบไม่ได้ ลองใหม่อีกครั้ง'); return r.json(); })
+    .then(function(j){ if (!j.ok) throw new Error(j.error); return j.data; });
+}
+function msg(e){ return (e && e.message) ? e.message.replace(/^Exception:\s*/,'') : 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง'; }
+function showErr(id, t){ var el=$(id); el.textContent=t; el.style.display = t ? 'block':'none'; }
+
+$('pumpTag').textContent = PUMP ? 'ตู้จ่าย ' + PUMP : 'สั่งจากหน้าลาน';
+
+call('getInitData').then(function(d){
+  D = d;
+  $('loading').classList.add('hide');
+  $('shopName').textContent = d.shopName;
+  if (!d.open) { $('closed').classList.remove('hide'); return; }
+  $('discHint').textContent = d.memberDiscount > 0 ? 'ใส่เบอร์สมาชิก ลดแก้วละ ' + d.memberDiscount + ' บาท' : 'ใส่เบอร์เพื่อสะสมแต้ม';
+  renderMenu();
+  go(1);
+}).catch(function(e){ $('loading').textContent = msg(e); });
+
+function go(n){
+  [1,2,3,4].forEach(function(i){ $('s'+i).classList.toggle('hide', i!==n); });
+  [].forEach.call($('bar').children, function(b,i){ b.classList.toggle('on', i<n); });
+  $('foot').classList.toggle('hide', n!==2);
+  window.scrollTo(0,0);
+}
+
+function toMenu(withPhone){
+  showErr('e1','');
+  if (withPhone) {
+    var p = $('phone').value.replace(/\D/g,'');
+    if (p && !/^0\d{9}$/.test(p)) { showErr('e1','เบอร์ต้องเป็นมือถือ 10 หลัก'); return; }
+    member = p;
+  } else { member = ''; $('phone').value=''; }
+  var tag = $('memberTag');
+  if (member && D.memberDiscount>0) { tag.textContent='สมาชิก ลงท้าย '+member.slice(-4)+' · ลด ฿'+D.memberDiscount+'/แก้ว'; tag.classList.remove('hide'); }
+  else tag.classList.add('hide');
+  updateFoot();
+  go(2);
+}
+
+function renderMenu(){
+  if (!D.items.length) { $('menu').innerHTML = '<div class="card empty">ยังไม่มีเมนูเปิดขาย</div>'; return; }
+  var h = '';
+  D.items.forEach(function(m, i){
+    var types = Object.keys(TYPE_LABEL).filter(function(t){ return m.prices[t]; });
+    sel[i] = { type: types[0], sweet: D.sweetness.length ? D.sweetness[Math.min(2, D.sweetness.length-1)] : '' };
+    h += '<div class="card"><div class="row"><span class="item-name">'+esc(m.name)+'</span><span id="pr'+i+'" style="color:var(--mut)"></span></div>';
+    h += '<div class="chips">' + types.map(function(t){ return '<button class="chip" data-i="'+i+'" data-k="type" data-v="'+t+'">'+TYPE_LABEL[t]+'</button>'; }).join('') + '</div>';
+    if (D.sweetness.length) h += '<div class="chips">' + D.sweetness.map(function(s){ return '<button class="chip" data-i="'+i+'" data-k="sweet" data-v="'+esc(s)+'">'+esc(s)+'</button>'; }).join('') + '</div>';
+    h += '<button class="btn out add" onclick="addItem('+i+')">+ เพิ่มลงตะกร้า</button></div>';
+  });
+  $('menu').innerHTML = h;
+  [].forEach.call(document.querySelectorAll('#menu .chip'), function(c){
+    c.onclick = function(){ sel[c.dataset.i][c.dataset.k] = c.dataset.v; paintSel(); };
+  });
+  paintSel();
+}
+
+function paintSel(){
+  [].forEach.call(document.querySelectorAll('#menu .chip'), function(c){
+    c.classList.toggle('on', sel[c.dataset.i][c.dataset.k] === c.dataset.v);
+  });
+  D.items.forEach(function(m,i){ $('pr'+i).textContent = '฿' + m.prices[sel[i].type]; });
+}
+
+function cups(){ return cart.reduce(function(a,c){ return a+c.qty; },0); }
+
+function addItem(i){
+  if (cups() >= D.maxCups) { alert('สั่งได้สูงสุด '+D.maxCups+' แก้วต่อออเดอร์'); return; }
+  var m = D.items[i], s = sel[i];
+  var ex = cart.filter(function(c){ return c.id===m.id && c.type===s.type && c.sweet===s.sweet; })[0];
+  if (ex) ex.qty++; else cart.push({ id:m.id, name:m.name, type:s.type, sweet:s.sweet, qty:1, price:m.prices[s.type] });
+  renderCart();
+}
+
+function changeQty(k, d){
+  var c = cart[k];
+  if (d>0 && cups() >= D.maxCups) return;
+  c.qty += d;
+  if (c.qty <= 0) cart.splice(k,1);
+  renderCart();
+}
+
+function renderCart(){
+  $('cartBox').classList.toggle('hide', !cart.length);
+  $('cart').innerHTML = cart.map(function(c,k){
+    return '<div class="row" style="padding:8px 0;border-top:1px solid #EEE"><div><div style="font-weight:600">'+esc(c.name)+'</div><small style="color:var(--mut)">'+TYPE_LABEL[c.type]+(c.sweet?' · '+esc(c.sweet):'')+' · ฿'+c.price+'</small></div>'+
+      '<div class="qty"><button class="qbtn" aria-label="ลด" onclick="changeQty('+k+',-1)">−</button><b>'+c.qty+'</b><button class="qbtn p" aria-label="เพิ่ม" onclick="changeQty('+k+',1)">+</button></div></div>';
+  }).join('');
+  updateFoot();
+}
+
+function updateFoot(){
+  var n = cups(), sub = cart.reduce(function(a,c){ return a+c.qty*c.price; },0);
+  var disc = member ? D.memberDiscount*n : 0;
+  $('fCups').textContent = n + ' แก้ว';
+  $('fTotal').textContent = '฿' + Math.max(0, sub-disc);
+  $('payBtn').disabled = !n;
+}
+
+function linesPayload(){ return cart.map(function(c){ return {id:c.id, type:c.type, sweet:c.sweet, qty:c.qty}; }); }
+
+function toPay(){
+  if (busy) return; busy = true; $('payBtn').disabled = true; $('payBtn').textContent = 'กำลังคิดยอด...';
+  call('getQuote', linesPayload(), member).then(function(q){
+    quote = q;
+    var h = q.lines.map(function(l){ return '<div class="line"><span>'+esc(l.name)+' '+l.type+(l.sweet?' ('+esc(l.sweet)+')':'')+' × '+l.qty+'</span><span>฿'+(l.price*l.qty)+'</span></div>'; }).join('');
+    if (q.discount) h += '<div class="line disc"><span>ส่วนลดสมาชิกกรีนไมลส์ ('+q.cups+' แก้ว)</span><span>−฿'+q.discount+'</span></div>';
+    h += '<div class="line total"><span>ยอดชำระ</span><span>฿'+q.total+'</span></div>';
+    $('summary').innerHTML = h;
+    $('qr').innerHTML = '';
+    new QRCode($('qr'), { text: q.payload, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+    slip = null; $('slip').value=''; $('slipPrev').style.display='none'; $('slipInfo').innerHTML=''; $('confirmBtn').disabled = true; showErr('e3','');
+    go(3);
+  }).catch(function(e){ alert(msg(e)); }).then(function(){ busy=false; $('payBtn').textContent='ไปชำระเงิน'; updateFoot(); });
+}
+
+function onSlip(inp){
+  var f = inp.files && inp.files[0]; if (!f) return;
+  showErr('e3','');
+  var url = URL.createObjectURL(f), img = new Image();
+  img.onload = function(){
+    var max = 1280, r = Math.min(1, max/Math.max(img.width, img.height));
+    var cv = document.createElement('canvas'); cv.width = Math.round(img.width*r); cv.height = Math.round(img.height*r);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    var d = cv.toDataURL('image/jpeg', 0.8);
+    URL.revokeObjectURL(url);
+    var qr = readSlipQR(img);
+    slip = { mime:'image/jpeg', data: d.split(',')[1], qr: qr };
+    $('slipPrev').src = d; $('slipPrev').style.display='block';
+    $('slipInfo').innerHTML = qr ? '<span style="color:var(--g);font-weight:600">✓ อ่าน QR ในสลิปได้</span>'
+      : '<span style="color:#9A2B13">อ่าน QR ในสลิปไม่ได้ แนะนำให้แนบสลิปเต็มใบจากแอปธนาคาร (ไม่ครอบตัด) ร้านจะตรวจสลิปด้วยตา</span>';
+    $('confirmBtn').disabled = false;
+  };
+  img.onerror = function(){ showErr('e3','อ่านรูปไม่ได้ ลองเลือกรูปใหม่'); };
+  img.src = url;
+}
+
+// อ่าน QR บนสลิป ลองหลายขนาดเพราะ QR บนสลิปมีขนาดเล็ก
+function readSlipQR(img){
+  if (!window.jsQR) return '';
+  var big = Math.max(img.width, img.height), sizes = [Math.min(2400, big), 1600, 1000];
+  for (var k = 0; k < sizes.length; k++) {
+    try {
+      var r = Math.min(1, sizes[k]/big), w = Math.round(img.width*r), h = Math.round(img.height*r);
+      var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      var cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, w, h);
+      var q = jsQR(cx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'attemptBoth' });
+      if (q && q.data) return q.data;
+    } catch(e) {}
+  }
+  return '';
+}
+
+function confirmOrder(){
+  if (busy || !slip) return; busy = true;
+  var b = $('confirmBtn'); b.disabled = true; b.textContent = 'กำลังส่งออเดอร์...';
+  call('submitOrder', { pump: PUMP, phone: member, lines: linesPayload(), slip: { mime: slip.mime, data: slip.data }, slipQR: slip.qr }).then(function(r){
+    $('qNo').textContent = r.queue; $('qNo2').textContent = r.queue;
+    $('doneInfo').innerHTML = '<div class="line"><span style="color:var(--mut)">รายการ</span><span style="text-align:right;white-space:pre-line">'+esc(r.itemsText)+'</span></div>'+
+      '<div class="line"><span style="color:var(--mut)">ยอดที่จ่าย</span><span>฿'+r.total+'</span></div>'+
+      (r.last4 ? '<div class="line"><span style="color:var(--mut)">สมาชิก</span><span>เบอร์ลงท้าย '+r.last4+'</span></div>' : '');
+    cart = []; go(4);
+  }).catch(function(e){ showErr('e3', msg(e)); b.disabled = false; }).then(function(){ busy=false; b.textContent='ยืนยันการสั่ง'; });
+}
+</script>
+</body>
+</html>

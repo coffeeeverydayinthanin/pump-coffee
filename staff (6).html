@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ออเดอร์หน้าร้าน</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+  :root{--g:#1F5C3A;--g2:#E7F0EA;--bg:#F6F4EF;--ink:#1C1B18;--mut:#5F5B52;--warn:#B45309;--red:#9A2B13}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Thai',sans-serif}
+  .wrap{max-width:720px;margin:0 auto;padding:16px}
+  h1{font-size:22px;margin:0}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .card{background:#fff;border-radius:14px;padding:14px;margin-top:12px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .card.late{border:2px solid var(--red)}
+  .card.done{opacity:.6}
+  .q{font-size:30px;font-weight:700;color:var(--g)}
+  .meta{color:var(--mut);font-size:14px}
+  .items{white-space:pre-line;font-size:17px;font-weight:600;margin:8px 0}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  button{font-family:inherit;font-size:15px;font-weight:600;min-height:44px;padding:0 14px;border-radius:10px;border:1.5px solid var(--g);background:#fff;color:var(--g);cursor:pointer}
+  button.on{background:var(--g);color:#fff}
+  button:disabled{opacity:.5}
+  button.big{width:100%;min-height:54px;font-size:17px}
+  .badge{display:inline-block;font-size:13px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--g2);color:var(--g)}
+  .badge.w{background:#FEF3C7;color:var(--warn)}
+  .badge.r{background:#FBE9E7;color:var(--red)}
+  input{height:48px;font-size:20px;padding:0 14px;border-radius:10px;border:1.5px solid #CFCAC0;width:180px;font-family:inherit}
+  .toggle{min-width:150px}
+  .toggle.open{background:var(--g);color:#fff}
+  .toggle.closed{border-color:var(--red);color:var(--red)}
+  .sec{margin-top:22px;font-weight:700;color:var(--mut)}
+  a{color:var(--g);font-weight:600}
+  .hide{display:none}
+  .err{color:var(--red);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="login">
+    <h1>ออเดอร์ QR หน้าลาน</h1>
+    <div class="card">
+      <label for="pin" style="display:block;font-weight:600;margin-bottom:8px">PIN พนักงาน</label>
+      <div class="row" style="justify-content:flex-start">
+        <input id="pin" type="password" inputmode="numeric" autocomplete="off">
+        <button class="on" onclick="login()">เข้าใช้</button>
+      </div>
+      <div class="err" id="lerr"></div>
+    </div>
+  </div>
+
+  <div id="app" class="hide">
+    <div class="row">
+      <h1>ออเดอร์ QR วันนี้</h1>
+      <button id="tg" class="toggle" onclick="toggleOpen()">-</button>
+    </div>
+    <button id="soundBtn" class="big" style="margin-top:10px;border-color:var(--warn);color:var(--warn)" onclick="enableSound()">แตะเพื่อเปิดเสียงเตือนออเดอร์</button>
+    <div class="meta" id="stat" style="margin-top:6px"></div>
+    <div class="sec">B2B ส่งวันนี้</div>
+    <div id="b2b"></div>
+    <div class="sec">QR หน้าลาน</div>
+    <div id="active"></div>
+    <div class="sec" id="doneHead"></div>
+    <div id="done"></div>
+
+    <div class="sec">ปิดยอดวันนี้</div>
+    <div class="card">
+      <div class="meta" id="closeSys"></div>
+      <label for="posAmt" style="display:block;font-weight:600;margin:10px 0 6px">ยอดวิธีชำระ "โอน" จากรายงานปิดวัน POS (บาท)</label>
+      <div class="row" style="justify-content:flex-start">
+        <input id="posAmt" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+        <button class="on" onclick="closeDay()">เทียบยอด</button>
+      </div>
+      <div id="closeRes" style="margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var PIN = '', DATA = null, busy = false;
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+var API = 'https://script.google.com/macros/s/AKfycbx_oO0QuXznUCtRi-vTO-EFAUhNowiQ19q52pitfFOjzc5zoCMVjBM15nOpKV9yAJRrSA/exec';
+function call(action){ var args = [].slice.call(arguments,1);
+  return fetch(API, { method:'POST', body: JSON.stringify({ action: action, args: args }) })
+    .then(function(r){ if (!r.ok) throw new Error('เชื่อมต่อระบบไม่ได้ ลองใหม่อีกครั้ง'); return r.json(); })
+    .then(function(j){ if (!j.ok) throw new Error(j.error); return j.data; });
+}
+function msg(e){ return (e&&e.message)?e.message.replace(/^Exception:\s*/,''):'เกิดข้อผิดพลาด'; }
+
+try { PIN = sessionStorage.getItem('pin') || ''; } catch(e) {}
+if (PIN) load();
+
+function login(){
+  PIN = $('pin').value.trim(); $('lerr').textContent='';
+  load(true);
+}
+
+function load(fromLogin){
+  call('staffGet', PIN).then(function(d){
+    try { sessionStorage.setItem('pin', PIN); } catch(e) {}
+    $('login').classList.add('hide'); $('app').classList.remove('hide');
+    render(d);
+  }).catch(function(e){
+    if (fromLogin || !DATA) { $('login').classList.remove('hide'); $('app').classList.add('hide'); $('lerr').textContent = msg(e); }
+  });
+}
+
+/* ---------- เสียงเตือน ---------- */
+var AC = null, wakeLock = null, firstLoad = true;
+var seenQR = {}, seenB2B = {}, warnedSoon = {};
+var SOON_MIN = 20; // เตือนเมื่อรอบ B2B เหลือไม่เกินกี่นาที
+
+function enableSound(){
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    beep([880, 1175], 0.18);
+    var b = $('soundBtn'); b.textContent = 'เสียงเตือน: เปิดแล้ว'; b.disabled = true;
+    b.style.borderColor = 'var(--g)'; b.style.color = 'var(--g)';
+  } catch(e) { alert('เครื่องนี้เล่นเสียงไม่ได้'); }
+  keepAwake();
+}
+
+function beep(freqs, dur){
+  if (!AC) return;
+  var t = AC.currentTime;
+  freqs.forEach(function(f, i){
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t + i*dur);
+    g.gain.exponentialRampToValueAtTime(0.6, t + i*dur + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (i+1)*dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t + i*dur); o.stop(t + (i+1)*dur + 0.02);
+  });
+}
+
+// ออเดอร์ใหม่: ติ๊ง-ต่อง 3 รอบ / B2B ใกล้ถึงรอบ: เสียงต่ำ 2 จังหวะ
+function alertNew(){ beep([988,1319,988,1319,988,1319], 0.16); flashTitle('ออเดอร์ใหม่!'); }
+function alertSoon(){ beep([523,392,523,392], 0.28); flashTitle('B2B ใกล้ถึงรอบ'); }
+
+var baseTitle = document.title, flashT = null;
+function flashTitle(t){
+  clearInterval(flashT); var n = 0;
+  flashT = setInterval(function(){ document.title = (n++ % 2) ? baseTitle : t; if (n > 12) { clearInterval(flashT); document.title = baseTitle; } }, 800);
+}
+
+function keepAwake(){
+  try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function(l){ wakeLock = l; }).catch(function(){}); } catch(e) {}
+}
+document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible' && AC) keepAwake(); });
+
+function checkAlerts(d){
+  var isNew = false, isSoon = false;
+  d.orders.forEach(function(o){
+    if (!seenQR[o.id]) { seenQR[o.id] = 1; if (!firstLoad && o.status !== 'ลูกค้ารับแล้ว') isNew = true; }
+  });
+  (d.b2b || []).forEach(function(b){
+    if (!seenB2B[b.orderNo]) { seenB2B[b.orderNo] = 1; if (!firstLoad && !isCancel(b)) isNew = true; }
+    var m = b.minsToSlot;
+    if (!isCancel(b) && !isSent(b) && m != null && m >= 0 && m <= SOON_MIN && !warnedSoon[b.orderNo] && AC) {
+      warnedSoon[b.orderNo] = 1; isSoon = true;
+    }
+  });
+  firstLoad = false;
+  if (isNew) alertNew(); else if (isSoon) alertSoon();
+}
+
+function render(d){
+  DATA = d;
+  checkAlerts(d);
+  var tg = $('tg');
+  tg.textContent = d.open ? 'เปิดรับอยู่ (กดเพื่อปิด)' : 'ปิดรับอยู่ (กดเพื่อเปิด)';
+  tg.className = 'toggle ' + (d.open ? 'open' : 'closed');
+
+  var act = d.orders.filter(function(o){ return o.status !== 'ลูกค้ารับแล้ว'; });
+  var fin = d.orders.filter(function(o){ return o.status === 'ลูกค้ารับแล้ว'; });
+  var cups = d.orders.reduce(function(a,o){ return a+Number(o.cups||0); },0);
+  var sum = d.orders.reduce(function(a,o){ return a+Number(o.total||0); },0);
+  var noPos = d.orders.filter(function(o){ return !o.pos; }).length;
+  var b2b = (d.b2b || []).filter(function(b){ return !isCancel(b); });
+  var b2bSum = b2b.reduce(function(a,b){ return a+Number(b.total||0); },0);
+  var b2bNoPos = b2b.filter(function(b){ return !b.pos; }).length;
+  $('stat').innerHTML = 'QR '+d.orders.length+' ออเดอร์ · '+cups+' แก้ว · ฿'+sum +
+    ' &nbsp;|&nbsp; B2B '+b2b.length+' ออเดอร์ · ฿'+b2bSum +
+    ' &nbsp;|&nbsp; <b>รวม ฿'+(sum+b2bSum)+'</b>' +
+    ((noPos+b2bNoPos) ? ' · <span class="badge r">ยังไม่คีย์ POS '+(noPos+b2bNoPos)+'</span>' : '');
+
+  $('closeSys').innerHTML = 'ยอดในระบบวันนี้: QR ฿'+sum+' + B2B ฿'+b2bSum+' = <b style="color:var(--ink)">฿'+(sum+b2bSum)+'</b>';
+  var c = d.closing;
+  if (c) {
+    var ok = Number(c.diff) === 0;
+    $('closeRes').innerHTML = '<div class="badge '+(ok?'':'r')+'" style="font-size:15px;padding:6px 12px">'+(ok?'✓ ':'')+esc(c.result)+'</div>'+
+      '<div class="meta" style="margin-top:6px">เทียบล่าสุด '+esc(c.time)+' · POS ฿'+esc(c.pos)+' / ระบบ ฿'+esc(c.sys)+'</div>'+
+      (!ok && Number(c.diff) < 0 ? '<div class="meta" style="margin-top:6px">POS น้อยกว่าระบบ แปลว่ามีบิลที่ยังไม่ได้คีย์ ไล่ดูเลขคิวในบิล POS เทียบกับรายการวันนี้'+(c.pending ? '<br>ยังไม่กดปุ่ม: <b>'+esc(c.pending)+'</b>' : '')+'</div>' : '')+
+      (!ok && Number(c.diff) > 0 ? '<div class="meta" style="margin-top:6px">POS มากกว่าระบบ อาจมีบิลลูกค้าหน้าร้านถูกคีย์เป็น "โอน" หรือคีย์ซ้ำ</div>' : '');
+  } else $('closeRes').innerHTML = '';
+
+  if (d.b2bError) $('b2b').innerHTML = '<div class="card err">โหลด B2B ไม่ได้: '+esc(d.b2bError)+'</div>';
+  else if (!(d.b2b||[]).length) $('b2b').innerHTML = '<div class="card meta">ไม่มีออเดอร์ B2B วันนี้</div>';
+  else {
+    var list = d.b2b.slice().sort(function(a,b){ return rankB2B(a)-rankB2B(b); });
+    $('b2b').innerHTML = list.map(b2bCard).join('');
+  }
+
+  $('active').innerHTML = act.length ? act.map(card).join('') : '<div class="card meta">ไม่มีออเดอร์รอทำ</div>';
+  $('doneHead').textContent = fin.length ? 'รับแล้ว ('+fin.length+')' : '';
+  $('done').innerHTML = fin.map(card).join('');
+}
+
+function card(o){
+  var late = o.status !== 'ลูกค้ารับแล้ว' && o.mins >= 30;
+  var cls = 'card' + (late ? ' late' : '') + (o.status === 'ลูกค้ารับแล้ว' ? ' done' : '');
+  var st = o.status === 'ลูกค้ารับแล้ว' ? '<span class="badge">รับแล้ว '+esc(o.picked)+'</span>' : '<span class="badge w">ต้องทำ</span>';
+  var h = '<div class="'+cls+'"><div class="row"><span class="q">'+esc(o.queue)+'</span><span>'+st+'</span></div>';
+  h += '<div class="meta">'+esc(o.time)+' · ตู้ '+esc(o.pump)+' · '+o.mins+' นาทีที่แล้ว'+(late?' · <b style="color:var(--red)">ค้างเกิน 30 นาที</b>':'')+'</div>';
+  h += '<div class="items">'+esc(o.items)+'</div>';
+  h += '<div class="meta">ยอดโอน ฿'+esc(o.total)+(Number(o.discount)?' (ลดสมาชิก ฿'+esc(o.discount)+')':'')+' · <a href="'+esc(o.slip)+'" target="_blank" rel="noopener">ดูสลิป</a> '+
+    (o.slipRef ? '<span class="badge">สลิปไม่ซ้ำ ✓</span>' : '<span class="badge r">ไม่มี QR ในสลิป ตรวจด้วยตา</span>')+'</div>';
+  h += '<div class="meta">สมาชิกกรีนไมลส์: '+(o.phone ? '<b style="color:var(--ink)">'+esc(o.phone)+'</b>' : 'ไม่มี (ถามตอนลูกค้ามารับ)')+'</div>';
+  if (o.status !== 'ลูกค้ารับแล้ว') h += '<div class="btns"><button class="on big" onclick="act(\''+o.id+'\',\'complete\')">คีย์ POS + ส่งแล้ว</button></div>';
+  return h + '</div>';
+}
+
+function isCancel(b){ return /ยกเลิก/.test(b.status); }
+function isSent(b){ return /^ส่งแล้ว/.test(b.shopStatus); }
+function rankB2B(b){ return isCancel(b) ? 2 : (isSent(b) ? 1 : 0); }
+
+function b2bCard(b){
+  var cancel = isCancel(b), sent = isSent(b), done = b.shopStatus === 'ทำเสร็จ';
+  var m = b.minsToSlot, late = !cancel && !sent && m != null && m < 0, soon = !cancel && !sent && !done && m != null && m >= 0 && m <= 30;
+  var cls = 'card' + (late ? ' late' : '') + ((cancel || sent) ? ' done' : '');
+  var st = cancel ? '<span class="badge r">ยกเลิก</span>' :
+           sent ? '<span class="badge">'+esc(b.shopStatus)+'</span>' :
+           done ? '<span class="badge">ทำเสร็จ รอส่ง</span>' :
+           '<span class="badge w">ต้องทำ</span>';
+  var when = m == null ? '' : (m >= 0 ? 'อีก '+m+' นาที' : 'เลยรอบมา '+(-m)+' นาที');
+  var parts = b.company.split('|'), map = (b.company.match(/https?:\/\/\S+/) || [])[0];
+  var place = parts.slice(1).filter(function(p){ return !/https?:\/\//.test(p); }).join(' · ');
+  var h = '<div class="'+cls+'"><div class="row"><span class="q">'+esc(b.slot)+'</span><span>'+st+'</span></div>';
+  h += '<div class="meta">'+esc(b.orderNo)+(when ? ' · <b style="color:'+(late?'var(--red)':soon?'var(--warn)':'var(--mut)')+'">'+when+'</b>' : '')+'</div>';
+  h += '<div style="font-weight:700;margin-top:6px">'+esc(parts[0].trim())+'</div>';
+  h += '<div class="meta">'+esc(place)+(map ? ' · <a href="'+esc(map)+'" target="_blank" rel="noopener">แผนที่</a>' : '')+'</div>';
+  h += '<div class="meta">ผู้ติดต่อ: '+esc(b.contact)+'</div>';
+  h += b.items ? '<div class="items">'+esc(b.items)+'</div>' : '<div class="items" style="color:var(--red)">ไม่มีรายการใน Sheet B2B (เช็กแถวนี้)</div>';
+  if (b.free && !/ไม่รับสิทธิ์/.test(b.free)) h += '<div class="meta" style="color:var(--g);font-weight:600">แถม: '+esc(b.free)+'</div>';
+  if (b.note) h += '<div class="meta">หมายเหตุ: '+esc(b.note)+'</div>';
+  h += '<div class="meta">ยอดโอน ฿'+esc(b.total)+(/^https?:\/\//.test(b.slip) ? ' · <a href="'+esc(b.slip)+'" target="_blank" rel="noopener">ดูสลิป</a>' : (b.slip ? ' · '+esc(b.slip) : ''))+'</div>';
+  if (!cancel && !sent) h += '<div class="btns"><button class="on big" onclick="actB2B(\''+esc(b.orderNo)+'\',\'complete\')">คีย์ POS + ส่งออกแล้ว</button></div>';
+  return h + '</div>';
+}
+
+function actB2B(no, a){
+  if (busy) return; busy = true;
+  call('staffB2BAction', PIN, no, a).then(render).catch(function(e){ alert(msg(e)); }).then(function(){ busy=false; });
+}
+
+function closeDay(){
+  if (busy) return;
+  var v = $('posAmt').value.trim();
+  if (!v) { alert('ใส่ยอดโอนจาก POS ก่อน'); return; }
+  busy = true;
+  call('staffClose', PIN, v).then(function(d){ render(d); $('posAmt').value=''; })
+    .catch(function(e){ alert(msg(e)); }).then(function(){ busy=false; });
+}
+
+function act(id, a){
+  if (busy) return; busy = true;
+  call('staffAction', PIN, id, a).then(render).catch(function(e){ alert(msg(e)); }).then(function(){ busy=false; });
+}
+
+function toggleOpen(){
+  if (busy || !DATA) return;
+  if (DATA.open && !confirm('ปิดรับออเดอร์ QR ชั่วคราว?')) return;
+  busy = true;
+  call('staffSetOpen', PIN, !DATA.open).then(render).catch(function(e){ alert(msg(e)); }).then(function(){ busy=false; });
+}
+
+setInterval(function(){ if (PIN && DATA && !busy) load(); }, 15000);
+</script>
+</body>
+</html>
